@@ -1,11 +1,9 @@
 """Tests for app/api.py helpers (no sound card or window needed)."""
 
-from pathlib import Path
-
-from app.api import title_from_filename
+from app.api import format_label
 
 
-def test_title_from_filename():
-    assert title_from_filename(Path("testdata/metallica_fuel.mp3")) == "Metallica Fuel"
-    assert title_from_filename(Path("tone_44.1k_16bit.flac")) == "Tone 44.1K 16Bit"
-    assert title_from_filename(Path("Some-Song.wav")) == "Some Song"
+def test_format_label():
+    assert format_label({"format": "FLAC", "bit_depth": 24, "sample_rate": 96_000}) == "FLAC · 24/96"
+    assert format_label({"format": "WAV", "bit_depth": 16, "sample_rate": 44_100}) == "WAV · 16/44.1"
+    assert format_label({"format": "MP3", "bit_depth": None, "sample_rate": 44_100}) == "MP3 · 44.1 kHz"

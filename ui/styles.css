@@ -209,3 +209,10 @@ button:disabled:hover { color: inherit; }
 .empty { padding: 12px 12px; font-size: 13px; color: var(--text-3); line-height: 1.5; }
 .volume div { width: 100%; }                         /* 100% = untouched signal */
 .hero h1 { overflow-wrap: anywhere; }
+.library-buttons { display: flex; gap: 14px; }
+.scan-note { margin: 10px 24px 0; font-size: 12px; color: var(--text-3); }
+.hero-meta .strong { color: var(--text); font-weight: 500; }
+.hero-art { background-color: var(--tile); }
+.welcome { padding: 72px 48px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; max-width: 640px; }
+.welcome h1 { margin: 0; font-family: var(--font-display); font-variation-settings: 'SOFT' 100, 'opsz' 144; font-weight: 400; font-size: 52px; line-height: 1; letter-spacing: -0.02em; }
+.welcome p { margin: 0 0 8px; color: var(--text-2); line-height: 1.5; }

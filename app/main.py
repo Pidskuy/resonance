@@ -1,32 +1,30 @@
 """Start Resonance: open a native Mac window showing the UI.
 
-Run with:  uv run python -m app.main                       (plays the default track)
-     or:   uv run python -m app.main testdata/some_file.flac
+Run with:  uv run python -m app.main
 """
 
-import sys
+import os
 from pathlib import Path
 
 import webview  # the pywebview package is imported as "webview"
 
 from app.api import Api
+from app.library.db import Library
 
 # Path(__file__) is this file (app/main.py). .parent.parent goes up two
 # levels to the project folder, so the path works from any working directory.
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 UI_FILE = PROJECT_DIR / "ui" / "index.html"
 
-# Slice 4 plays one fixed track. Slices 5–6 replace this with the library and queue.
-DEFAULT_TRACK = PROJECT_DIR / "testdata" / "metallica_fuel.mp3"
+# The library database lives where Mac apps keep their data. Setting the
+# RESONANCE_DB environment variable uses a different file (handy for testing).
+DEFAULT_DB = Path.home() / "Library" / "Application Support" / "Resonance" / "library.db"
 
 
 def main() -> None:
-    track = Path(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_TRACK
-    if not track.exists():
-        sys.exit(f"Track not found: {track}\nGive a file: uv run python -m app.main path/to/file.mp3")
-
-    api = Api(track.resolve())
-    webview.create_window(
+    db_path = Path(os.environ.get("RESONANCE_DB", DEFAULT_DB))
+    api = Api(Library(db_path))
+    window = webview.create_window(
         title="Resonance",
         url=str(UI_FILE),
         js_api=api,                  # makes api's public methods callable from the page
@@ -35,11 +33,11 @@ def main() -> None:
         min_size=(1024, 680),
         background_color="#141210",  # matches --bg in the design, so no white flash
     )
+    api._window = window             # the Api needs the window to show the folder picker
     # http_server=True: pywebview serves ui/ through a tiny local web server, so the
-    # page can load its own files (app.js, styles.css, fonts). It's only reachable
-    # from this Mac. start() keeps running until the window is closed.
+    # page can load its own files. It's only reachable from this Mac.
     webview.start(http_server=True)
-    api._shutdown()                  # window closed → stop the sound
+    api._shutdown()                  # window closed → stop the sound, close the database
 
 
 # This block only runs when the file is started directly (not when imported).

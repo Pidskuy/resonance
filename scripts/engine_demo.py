@@ -1,7 +1,7 @@
 """Try the engine's controls on a file (slice 3's "done when").
 
 Run with:
-    uv run python -m scripts.engine_demo testdata/metallica_fuel.mp3 --device 1
+    uv run python -m scripts.engine_demo "testdata/Metallica - Fuel.mp3" --device 1
 
 Sequence: play 6 s → pause 2 s → seek to 1:00 while paused → resume →
 play 6 s → seek to 0:30 while playing → play 4 s → stop.

@@ -25,60 +25,99 @@
 
   <div class="body">
 
-    <!-- ===== Library (filled in slice 5) ===== -->
+    <!-- ===== Library sidebar ===== -->
     <aside class="library">
       <div class="library-head">
         <h2>Library</h2>
+        <span class="library-buttons">
+          <button class="ghost" @click="rescan()" :disabled="scanning || !library.folders.length">Rescan</button>
+          <button class="ghost" @click="addFolder()" :disabled="scanning">+ Folder</button>
+        </span>
       </div>
       <div class="library-tabs">
-        <button class="pill on">Playlists</button>
-        <button class="pill" style="border-color: transparent" disabled>Albums</button>
-        <button class="pill" style="border-color: transparent" disabled>Artists</button>
+        <button class="pill" disabled style="border-color: transparent">Playlists</button>
+        <button class="pill" :class="{ on: view === 'albums' }" :style="view === 'albums' ? '' : 'border-color: transparent'" @click="view = 'albums'">Albums</button>
+        <button class="pill" :class="{ on: view === 'artists' }" :style="view === 'artists' ? '' : 'border-color: transparent'" @click="view = 'artists'">Artists</button>
       </div>
+      <p class="scan-note" x-show="scanNote" x-text="scanNote"></p>
       <nav class="library-list" aria-label="Library">
-        <p class="empty">Your music folders will appear here.</p>
+        <template x-if="library.tracks.length">
+          <button class="pl" :class="{ active: !selected }" @click="select(null)">
+            <span class="tile"></span>
+            <span class="pl-text"><span class="pl-name truncate">All songs</span><span class="pl-meta" x-text="fmtLong(library.tracks.reduce((s, t) => s + t.duration, 0))"></span></span>
+            <span class="pl-count" x-text="library.tracks.length"></span>
+          </button>
+        </template>
+        <template x-for="item in sideItems" :key="view + item.name">
+          <button class="pl" :class="{ active: selected && selected.name === item.name && selected.kind === (view === 'albums' ? 'album' : 'artist') }"
+                  @click="select(view === 'albums' ? 'album' : 'artist', item.name)">
+            <span class="tile" :style="artStyle(item.art_id)"></span>
+            <span class="pl-text">
+              <span class="pl-name truncate" x-text="item.name"></span>
+              <span class="pl-meta truncate" x-text="view === 'albums' ? item.artist : plural(item.albums, 'album')"></span>
+            </span>
+            <span class="pl-count" x-text="item.tracks"></span>
+          </button>
+        </template>
+        <p class="empty" x-show="!library.tracks.length">Add a folder to see your albums and artists here.</p>
       </nav>
     </aside>
 
-    <!-- ===== Main: the current track ===== -->
+    <!-- ===== Main: the selected album / artist / all songs ===== -->
     <main class="main">
-      <div class="hero">
-        <div class="hero-art" aria-hidden="true">
-          <svg width="136" height="56" viewBox="0 0 140 56" fill="none" stroke="#EFE9DE" stroke-width="3" stroke-linecap="round"><path d="M3 32v4M11 26v16M19 18v28M27 24v18M35 10v40M43 20v22M51 28v12M59 14v34M67 22v20M75 30v8M83 16v30M91 24v16M99 8v44M107 20v22M115 28v10M123 18v26M131 26v12M139 30v6"/></svg>
+      <template x-if="!library.tracks.length">
+        <div class="welcome">
+          <h1>Your music, at its real quality.</h1>
+          <p>Choose a folder with MP3, FLAC or WAV files. Nothing is copied: Resonance reads them where they are.</p>
+          <button class="play-main" @click="addFolder()" :disabled="scanning" x-text="scanning ? 'Scanning…' : 'Add a music folder'"></button>
         </div>
-        <div class="hero-text">
-          <span class="eyebrow">Track</span>
-          <h1 x-text="track.title"></h1>
-          <div class="hero-meta">
-            <strong x-text="track.artist"></strong><span class="dot">·</span>
-            <span x-text="track.label"></span><span class="dot">·</span>
-            <span x-text="total"></span>
+      </template>
+
+      <template x-if="library.tracks.length">
+        <div>
+          <div class="hero">
+            <div class="hero-art" :style="artStyle(selectedGroup && selectedGroup.art_id)" aria-hidden="true">
+              <svg x-show="!(selectedGroup && arts[selectedGroup.art_id])" width="136" height="56" viewBox="0 0 140 56" fill="none" stroke="#EFE9DE" stroke-width="3" stroke-linecap="round"><path d="M3 32v4M11 26v16M19 18v28M27 24v18M35 10v40M43 20v22M51 28v12M59 14v34M67 22v20M75 30v8M83 16v30M91 24v16M99 8v44M107 20v22M115 28v10M123 18v26M131 26v12M139 30v6"/></svg>
+            </div>
+            <div class="hero-text">
+              <span class="eyebrow" x-text="heroEyebrow"></span>
+              <h1 x-text="heroTitle"></h1>
+              <div class="hero-meta">
+                <template x-for="(part, i) in heroMeta">
+                  <span><span class="dot" x-show="i > 0">·&nbsp;&nbsp;</span><span x-text="part" :class="{ strong: i === 0 && selected && selected.kind === 'album' }"></span></span>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="play-main" @click="current && playing ? toggle() : playTrack(visibleTracks[0].id)">
+              <svg x-show="current && playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+              <svg x-show="!(current && playing)" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
+              <span x-text="current && playing ? 'Pause' : 'Play'"></span>
+            </button>
+            <button class="icon-btn lg" aria-label="Shuffle" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+            <span class="spacer"></span>
+            <span class="ghost">Double-click a song to play it</span>
+          </div>
+
+          <div class="tracks">
+            <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Format</span><span class="end">Time</span></div>
+            <div class="track-list">
+              <template x-for="(t, i) in visibleTracks" :key="t.id">
+                <button class="track track-grid" :class="{ active: current && current.id === t.id }" @dblclick="playTrack(t.id)">
+                  <span class="num" x-text="current && current.id === t.id && playing ? '▶' : (t.track_no || i + 1)"></span>
+                  <span class="t-cell"><span class="tile" :style="artStyle(t.art_id)"></span>
+                    <span class="t-text"><span class="t-title truncate" x-text="t.title"></span><span class="t-artist truncate" x-text="t.artist"></span></span></span>
+                  <span class="t-album truncate" x-text="t.album"></span>
+                  <span class="t-added" x-text="t.label"></span>
+                  <span class="t-dur end" x-text="fmt(t.duration)"></span>
+                </button>
+              </template>
+            </div>
           </div>
         </div>
-      </div>
-
-      <div class="actions">
-        <button class="play-main" @click="toggle()">
-          <svg x-show="playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
-          <svg x-show="!playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
-          <span x-text="playing ? 'Pause' : 'Play'"></span>
-        </button>
-        <button class="icon-btn lg" aria-label="Shuffle" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
-      </div>
-
-      <div class="tracks">
-        <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Format</span><span class="end">Time</span></div>
-        <div class="track-list">
-          <button class="track track-grid" :class="{ active: state !== 'stopped' }" @click="toggle()">
-            <span class="num" x-text="playing ? '▶' : '1'"></span>
-            <span class="t-cell"><span class="tile"></span>
-              <span class="t-text"><span class="t-title truncate" x-text="track.title"></span><span class="t-artist" x-text="track.artist"></span></span></span>
-            <span class="t-album truncate">Unknown album</span>
-            <span class="t-added" x-text="track.label"></span>
-            <span class="t-dur end" x-text="total"></span>
-          </button>
-        </div>
-      </div>
+      </template>
     </main>
 
     <!-- ===== Right panel ===== -->
@@ -118,11 +157,11 @@
 
         <section class="now" aria-label="Now playing">
           <div class="now-row">
-            <span class="tile"></span>
+            <span class="tile" :style="current ? artStyle(current.art_id) : ''"></span>
             <span class="now-text">
-              <span class="now-title truncate" x-text="track.title"></span>
-              <span class="now-artist truncate" x-text="track.artist"></span>
-              <span class="now-tech" x-text="track.label"></span>
+              <span class="now-title truncate" x-text="current ? current.title : 'Nothing playing'"></span>
+              <span class="now-artist truncate" x-text="current ? current.artist : ''"></span>
+              <span class="now-tech" x-text="current ? current.label : ''"></span>
             </span>
           </div>
           <div class="stack" style="gap: 6px">
@@ -146,17 +185,17 @@
   <!-- ===== Player bar ===== -->
   <footer class="player">
     <div class="player-left">
-      <span class="tile"></span>
+      <span class="tile" :style="current ? artStyle(current.art_id) : ''"></span>
       <span class="now-text">
-        <span class="now-title truncate" x-text="track.title"></span>
-        <span class="now-artist truncate" x-text="track.artist"></span>
+        <span class="now-title truncate" x-text="current ? current.title : ''"></span>
+        <span class="now-artist truncate" x-text="current ? current.artist : ''"></span>
       </span>
     </div>
     <div class="player-center">
       <div class="transport">
         <button class="icon-btn" aria-label="Shuffle" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
         <button class="icon-btn" aria-label="Previous" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.5 12.9a1 1 0 0 1 0-1.8l7.95-5.73A1 1 0 0 1 19 6.2z"/></svg></button>
-        <button class="play" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle()">
+        <button class="play" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle()" :disabled="!library.tracks.length">
           <svg x-show="playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
           <svg x-show="!playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 8 4.5z"/></svg>
         </button>
