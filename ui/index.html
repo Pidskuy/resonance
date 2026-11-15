@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resonance</title>
+<link rel="stylesheet" href="styles.css">
+<!-- app.js first (it registers the component), then Alpine starts the page -->
+<script src="app.js"></script>
+<script defer src="vendor/alpine.min.js"></script>
+</head>
+<body>
+<div class="app" x-data="player" @keydown.space.window.prevent="toggle()">
+
+  <header class="topbar">
+    <div class="wordmark">Resonance</div>
+    <form class="search" role="search" onsubmit="return false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#948D82" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <label for="search" class="sr-only">Search</label>
+      <input id="search" type="search" placeholder="Search your library" disabled>
+      <kbd>⌘K</kbd>
+    </form>
+    <div class="topbar-right"></div>
+  </header>
+
+  <div class="body">
+
+    <!-- ===== Library (filled in slice 5) ===== -->
+    <aside class="library">
+      <div class="library-head">
+        <h2>Library</h2>
+      </div>
+      <div class="library-tabs">
+        <button class="pill on">Playlists</button>
+        <button class="pill" style="border-color: transparent" disabled>Albums</button>
+        <button class="pill" style="border-color: transparent" disabled>Artists</button>
+      </div>
+      <nav class="library-list" aria-label="Library">
+        <p class="empty">Your music folders will appear here.</p>
+      </nav>
+    </aside>
+
+    <!-- ===== Main: the current track ===== -->
+    <main class="main">
+      <div class="hero">
+        <div class="hero-art" aria-hidden="true">
+          <svg width="136" height="56" viewBox="0 0 140 56" fill="none" stroke="#EFE9DE" stroke-width="3" stroke-linecap="round"><path d="M3 32v4M11 26v16M19 18v28M27 24v18M35 10v40M43 20v22M51 28v12M59 14v34M67 22v20M75 30v8M83 16v30M91 24v16M99 8v44M107 20v22M115 28v10M123 18v26M131 26v12M139 30v6"/></svg>
+        </div>
+        <div class="hero-text">
+          <span class="eyebrow">Track</span>
+          <h1 x-text="track.title"></h1>
+          <div class="hero-meta">
+            <strong x-text="track.artist"></strong><span class="dot">·</span>
+            <span x-text="track.label"></span><span class="dot">·</span>
+            <span x-text="total"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="play-main" @click="toggle()">
+          <svg x-show="playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+          <svg x-show="!playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
+          <span x-text="playing ? 'Pause' : 'Play'"></span>
+        </button>
+        <button class="icon-btn lg" aria-label="Shuffle" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+      </div>
+
+      <div class="tracks">
+        <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Format</span><span class="end">Time</span></div>
+        <div class="track-list">
+          <button class="track track-grid" :class="{ active: state !== 'stopped' }" @click="toggle()">
+            <span class="num" x-text="playing ? '▶' : '1'"></span>
+            <span class="t-cell"><span class="tile"></span>
+              <span class="t-text"><span class="t-title truncate" x-text="track.title"></span><span class="t-artist" x-text="track.artist"></span></span></span>
+            <span class="t-album truncate">Unknown album</span>
+            <span class="t-added" x-text="track.label"></span>
+            <span class="t-dur end" x-text="total"></span>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ===== Right panel ===== -->
+    <aside class="panel">
+      <div class="panel-tabs" role="tablist">
+        <button role="tab" :aria-selected="tab === 'now'" @click="tab = 'now'">Now playing</button>
+        <button role="tab" :aria-selected="tab === 'eq'" @click="tab = 'eq'">Equalizer</button>
+      </div>
+
+      <div class="panel-view" :class="{ show: tab === 'now' }">
+        <section class="queue" aria-label="Queue">
+          <div class="section-head"><h2>Up next</h2></div>
+          <p class="empty">Nothing queued yet.</p>
+        </section>
+
+        <!-- Visualizers: shapes only for now; real data in slice 9 -->
+        <section class="viz" aria-label="Live visualizer">
+          <div class="section-head">
+            <h2>Live</h2>
+            <span class="live" :class="{ paused: !playing }" x-text="playing ? 'Listening' : 'Paused'"></span>
+          </div>
+          <div class="stack">
+            <div class="well" style="height: 128px">
+              <svg viewBox="0 0 320 100" preserveAspectRatio="none" role="img" aria-label="Live waveform">
+                <line x1="0" y1="50" x2="320" y2="50" stroke="#2D2925"/>
+              </svg>
+            </div>
+            <div class="caption"><span>Waveform</span><span x-text="rateText"></span></div>
+          </div>
+          <div class="stack">
+            <div class="spectrum">
+              <template x-for="i in 48"><span></span></template>
+            </div>
+            <div class="caption axis"><span>60</span><span>250</span><span>1k</span><span>4k</span><span>12k</span></div>
+          </div>
+        </section>
+
+        <section class="now" aria-label="Now playing">
+          <div class="now-row">
+            <span class="tile"></span>
+            <span class="now-text">
+              <span class="now-title truncate" x-text="track.title"></span>
+              <span class="now-artist truncate" x-text="track.artist"></span>
+              <span class="now-tech" x-text="track.label"></span>
+            </span>
+          </div>
+          <div class="stack" style="gap: 6px">
+            <div class="scrub" title="Seek" @click="seekFrom($event)">
+              <template x-for="(h, i) in scrub">
+                <span :style="`height:${h}px`" :class="{ played: i < fraction * scrub.length }"></span>
+              </template>
+            </div>
+            <div class="caption"><span x-text="elapsed"></span><span>−<span x-text="remaining"></span></span></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel-view eq-view" :class="{ show: tab === 'eq' }">
+        <div class="section-head"><h2>Equalizer</h2></div>
+        <p class="note">The equalizer comes in a later version. Until then, every sample reaches your output untouched.</p>
+      </div>
+    </aside>
+  </div>
+
+  <!-- ===== Player bar ===== -->
+  <footer class="player">
+    <div class="player-left">
+      <span class="tile"></span>
+      <span class="now-text">
+        <span class="now-title truncate" x-text="track.title"></span>
+        <span class="now-artist truncate" x-text="track.artist"></span>
+      </span>
+    </div>
+    <div class="player-center">
+      <div class="transport">
+        <button class="icon-btn" aria-label="Shuffle" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+        <button class="icon-btn" aria-label="Previous" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.5 12.9a1 1 0 0 1 0-1.8l7.95-5.73A1 1 0 0 1 19 6.2z"/></svg></button>
+        <button class="play" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle()">
+          <svg x-show="playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+          <svg x-show="!playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 8 4.5z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Next" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="16" y="5" width="3" height="14" rx="1"/><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l7.95-5.73a1 1 0 0 0 0-1.8L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg></button>
+        <button class="icon-btn" aria-label="Repeat" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></button>
+      </div>
+      <div class="progress">
+        <time x-text="elapsed"></time>
+        <div class="bar" @click="seekFrom($event)"><div class="bar-fill" :style="`width:${(fraction * 100).toFixed(2)}%`"></div></div>
+        <time x-text="total"></time>
+      </div>
+    </div>
+    <div class="player-right">
+      <button class="icon-btn" aria-label="Output device" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg></button>
+      <button class="icon-btn" aria-label="Volume" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></button>
+      <div class="volume"><div></div></div>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
