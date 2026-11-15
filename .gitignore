@@ -9,3 +9,8 @@ dist/
 testdata/
 .pytest_cache/
 *.log
+# audio files are never committed (copyright + size)
+*.mp3
+*.flac
+*.wav
+*.m4a
