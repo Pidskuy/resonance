@@ -91,8 +91,9 @@ resonance/
 │   ├── index.html
 │   ├── app.js
 │   └── styles.css
+├── scripts/           helper tools, not part of the app (e.g. make_test_audio.py)
 ├── tests/
-└── testdata/          generated test tones (not committed if large)
+└── testdata/          generated test tones + your own test music (never committed)
 ```
 
 ---
