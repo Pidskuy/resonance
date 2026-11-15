@@ -14,7 +14,7 @@ The visual and behavioural reference is `design/resonance-ui.html`. Match its lo
 3. **Keep changes small** so each one can be read and understood.
 4. **Show how to check it works.** At the end of each slice, give the exact command(s) to run and what they should see or hear. Use the slice's "done when" in PLAN.md as the test.
 5. **Commit at the end of each slice** with a clear message (e.g. `slice 2: play one file at native sample rate`), after the user confirms it works. Explain what the commit is.
-6. **LEARNING.md check.** After each slice, ask the user to write 3–4 sentences in `LEARNING.md` explaining what the slice does in their own words. Read it and gently correct anything wrong. Don't write it for them.
+6. **No LEARNING.md step.** The user chose (2026-11-15) to stop writing LEARNING.md entries after each slice. Don't ask for them. If they add one themselves and ask, check it gently.
 7. **If something breaks,** explain what the error means before fixing it.
 
 ## Technical rules

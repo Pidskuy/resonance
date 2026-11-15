@@ -78,7 +78,7 @@ This file holds every decision made during planning. If something here needs to 
 resonance/
 ├── CLAUDE.md          instructions for Claude Code (read every session)
 ├── PLAN.md            this file
-├── LEARNING.md        your own explanations, one entry per slice
+├── LEARNING.md        your own notes from slices 0–2 (optional from slice 3 on)
 ├── README.md
 ├── design/
 │   └── resonance-ui.html   the Claude Design export (visual + behaviour reference)
@@ -101,7 +101,7 @@ resonance/
 
 ## 4. Build slices (in order)
 
-Each slice is small, ends in something you can see or hear, and is committed to Git when its "done when" is true. After each slice, write your entry in `LEARNING.md`.
+Each slice is small, ends in something you can see or hear, and is committed to Git when its "done when" is true.
 
 ### Slice 0: Setup
 Install uv, create the project, Git repo, **public GitHub repo**, `.gitignore`. Open a pywebview window that just shows `design/resonance-ui.html`.
