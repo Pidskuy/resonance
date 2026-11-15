@@ -16,7 +16,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.library.tags import AUDIO_EXTENSIONS, Picture, read_track
+from app.library.tags import AUDIO_EXTENSIONS, UNKNOWN_ALBUM, Picture, read_track
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS folders (
@@ -190,14 +190,16 @@ class Library:
             return dict(row) if row else None
 
     def albums(self) -> list[dict]:
-        """One row per album. An album with several artists shows 'Various artists'."""
+        """One row per album. An album with several artists shows 'Various artists'.
+        Songs without an album tag aren't listed here (they're still in All songs)."""
         with self._lock:
             rows = self._db.execute(
                 """SELECT album AS name,
                           CASE WHEN COUNT(DISTINCT artist) > 1 THEN 'Various artists'
                                ELSE MIN(artist) END AS artist,
                           COUNT(*) AS tracks, SUM(duration) AS duration, MIN(art_id) AS art_id
-                   FROM tracks GROUP BY album ORDER BY album COLLATE NOCASE""")
+                   FROM tracks WHERE album != ?
+                   GROUP BY album ORDER BY album COLLATE NOCASE""", (UNKNOWN_ALBUM,))
             return [dict(row) for row in rows]
 
     def artists(self) -> list[dict]:

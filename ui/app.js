@@ -144,6 +144,9 @@ document.addEventListener('alpine:init', () => {
 
     select(kind, name) { this.selected = kind ? { kind, name } : null; },
 
+    /** The album to show in the table: blank for songs without an album tag. */
+    albumName(track) { return track.album === 'Unknown album' ? '' : track.album; },
+
     /** Inline style showing a cover, fetching it from Python the first time. */
     artStyle(artId) {
       if (!artId) return '';

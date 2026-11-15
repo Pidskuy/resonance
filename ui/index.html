@@ -60,6 +60,7 @@
           </button>
         </template>
         <p class="empty" x-show="!library.tracks.length">Add a folder to see your albums and artists here.</p>
+        <p class="empty" x-show="library.tracks.length && view === 'albums' && !library.albums.length">None of your songs have an album tag yet. They're all in All songs and under Artists.</p>
       </nav>
     </aside>
 
@@ -98,18 +99,18 @@
             </button>
             <button class="icon-btn lg" aria-label="Shuffle" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
             <span class="spacer"></span>
-            <span class="ghost">Double-click a song to play it</span>
+            <span class="ghost">Click a song to play it</span>
           </div>
 
           <div class="tracks">
             <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Format</span><span class="end">Time</span></div>
             <div class="track-list">
               <template x-for="(t, i) in visibleTracks" :key="t.id">
-                <button class="track track-grid" :class="{ active: current && current.id === t.id }" @dblclick="playTrack(t.id)">
+                <button class="track track-grid" :class="{ active: current && current.id === t.id }" @click="playTrack(t.id)">
                   <span class="num" x-text="current && current.id === t.id && playing ? '▶' : (t.track_no || i + 1)"></span>
                   <span class="t-cell"><span class="tile" :style="artStyle(t.art_id)"></span>
                     <span class="t-text"><span class="t-title truncate" x-text="t.title"></span><span class="t-artist truncate" x-text="t.artist"></span></span></span>
-                  <span class="t-album truncate" x-text="t.album"></span>
+                  <span class="t-album truncate" x-text="albumName(t)"></span>
                   <span class="t-added" x-text="t.label"></span>
                   <span class="t-dur end" x-text="fmt(t.duration)"></span>
                 </button>

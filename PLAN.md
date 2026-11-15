@@ -129,7 +129,7 @@ Choose a music folder → scan → read tags and album art with mutagen → stor
 **Done when:** your test folder (and later real music) shows up correctly, and rescanning an unchanged folder is fast.
 
 ### Slice 6: Queue & transport
-Up Next queue, next / previous, shuffle, repeat (off / all / one), double-click a track to play from there.
+Up Next queue, next / previous, shuffle, repeat (off / all / one), click a track to play from there (single click: user's choice, 2026-11-15).
 **Done when:** the queue panel matches what actually plays next, in every mode.
 
 ### Slice 7: Gapless + rate switching

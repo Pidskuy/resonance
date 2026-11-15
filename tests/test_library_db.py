@@ -96,6 +96,13 @@ def test_albums_and_artists(library, music):
     assert artists["Sevendust"]["tracks"] == 1
 
 
+def test_songs_without_album_are_not_listed_as_an_album(library, music):
+    sf.write(music / "Loose - Single.wav", np.zeros((4410, 2)), 44_100)   # untagged
+    library.add_folder(music)
+    assert "Unknown album" not in [a["name"] for a in library.albums()]
+    assert "Single" in [t["title"] for t in library.tracks()]           # still in All songs
+
+
 def test_shared_cover_is_stored_once_and_cleaned_up(library, music):
     library.add_folder(music)
     art_ids = {t["art_id"] for t in library.tracks() if t["album"] == "Reload"}
