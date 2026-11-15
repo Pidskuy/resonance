@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resonance — audio player UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..700,0..100&display=swap" rel="stylesheet">
+<style>
+/* ---------- Tokens ---------- */
+:root {
+  --bg: #141210;
+  --bg-raised: #1A1816;
+  --bg-hover: #1E1B18;
+  --bg-well: #0E0D0B;
+  --tile: #221E1A;
+  --line: #2D2925;
+  --line-strong: #3B3631;
+  --muted-2: #4E4740;
+  --text: #EFE9DE;
+  --text-2: #A89F93;
+  --text-3: #948D82;
+  --accent: #E8865F;
+  --radius: 10px;
+  --font: Figtree, system-ui, sans-serif;
+  --font-display: Fraunces, Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 14px; font-variant-numeric: tabular-nums;
+}
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--accent); }
+* { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.icon-btn { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-3); }
+.icon-btn.lg { width: 44px; height: 44px; color: var(--text-2); }
+.icon-btn:hover, .ghost:hover { color: var(--text); }
+.ghost { color: var(--text-2); font-size: 13px; }
+.tile { border-radius: 8px; background: var(--tile); flex-shrink: 0; }
+.pill { height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--line); color: var(--text-2); font-size: 13px; white-space: nowrap; }
+.pill.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+.truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- Shell ---------- */
+.app { height: 100vh; display: flex; flex-direction: column; }
+.topbar { height: 60px; flex-shrink: 0; display: flex; align-items: center; gap: 24px; padding: 0 24px; border-bottom: 1px solid var(--line); }
+.wordmark { font-family: var(--font-display); font-variation-settings: 'SOFT' 100, 'opsz' 24; font-weight: 500; font-size: 24px; letter-spacing: -0.01em; min-width: 220px; }
+.search { flex: 1 1 320px; max-width: 520px; margin: 0 auto; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 14px; border-radius: 19px; border: 1px solid var(--line); background: var(--bg-raised); }
+.search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
+.search input::placeholder { color: var(--text-3); }
+.search kbd { font: inherit; font-size: 11px; color: var(--text-3); }
+.topbar-right { display: flex; align-items: center; gap: 18px; min-width: 220px; justify-content: flex-end; }
+.topbar-right a { font-size: 13px; color: var(--text-2); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line); background: var(--line-strong); font-size: 12px; font-weight: 500; }
+
+.body { flex: 1; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto; }
+
+/* ---------- Library ---------- */
+.library { flex: 1 1 260px; max-width: 290px; min-width: 240px; min-height: 0; border-right: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+.library-head { display: flex; align-items: center; justify-content: space-between; padding: 22px 20px 12px 24px; }
+.library-head h2, .panel h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.library-tabs { display: flex; gap: 6px; padding: 0 20px 14px; border-bottom: 1px solid var(--line); }
+.library-list { flex: 1; overflow-y: auto; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
+.pl { display: flex; align-items: center; gap: 12px; padding: 7px 12px; border-radius: var(--radius); text-align: left; width: 100%; }
+.pl:hover { background: var(--bg-hover); }
+.pl.active { background: var(--bg-hover); }
+.pl.active .pl-name { color: var(--accent); }
+.pl .tile { width: 38px; height: 38px; }
+.pl-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.pl-name { font-weight: 500; }
+.pl-meta, .pl-count { font-size: 12px; color: var(--text-3); }
+
+/* ---------- Main ---------- */
+.main { flex: 999 1 520px; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.hero { padding: 40px 32px 28px; display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.hero-art { width: 168px; height: 168px; border-radius: 14px; background: var(--tile); display: flex; align-items: flex-end; padding: 16px; flex-shrink: 0; }
+.hero-text { display: flex; flex-direction: column; gap: 8px; min-width: 0; flex: 1; }
+.eyebrow { font-size: 13px; color: var(--text-2); }
+.hero h1 { margin: 0; font-family: var(--font-display); font-variation-settings: 'SOFT' 100, 'opsz' 144; font-weight: 400; font-size: 76px; line-height: 0.95; letter-spacing: -0.02em; }
+.hero-meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); margin-top: 8px; flex-wrap: wrap; }
+.hero-meta .dot { color: var(--muted-2); }
+.hero-meta strong { color: var(--text); font-weight: 500; }
+.actions { display: flex; align-items: center; gap: 8px; padding: 16px 32px 0; flex-wrap: wrap; }
+.play-main { height: 44px; padding: 0 22px 0 18px; border-radius: 22px; background: var(--accent); color: var(--bg); display: inline-flex; align-items: center; gap: 10px; font-weight: 600; }
+.play-main:hover { filter: brightness(1.08); }
+.spacer { flex: 1; }
+.chips { display: flex; gap: 6px; padding: 14px 32px 10px; overflow-x: auto; }
+.chips .pill { height: 32px; padding: 0 14px; border-radius: 16px; flex-shrink: 0; }
+.tracks { padding: 0 32px 24px; overflow-x: auto; }
+.track-grid { display: grid; grid-template-columns: 32px minmax(220px, 1.6fr) minmax(140px, 1fr) 120px 56px; gap: 16px; align-items: center; min-width: 620px; }
+.track-head { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--text-3); font-size: 12px; }
+.track-head .end, .track .end { justify-self: end; }
+.track-list { display: flex; flex-direction: column; padding-top: 4px; min-width: 620px; }
+.track { padding: 8px 12px; border-radius: var(--radius); text-align: left; width: 100%; }
+.track:hover { background: var(--bg-hover); }
+.track .num { font-size: 13px; color: var(--text-3); }
+.track.active .num, .track.active .t-title { color: var(--accent); }
+.track .t-cell { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.track .tile { width: 38px; height: 38px; }
+.track .t-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.track .t-title { font-weight: 500; }
+.track .t-artist, .track .t-added, .track .t-dur { font-size: 12px; color: var(--text-3); }
+.track .t-album { font-size: 13px; color: var(--text-2); }
+
+/* ---------- Right panel ---------- */
+.panel { flex: 1 1 340px; max-width: 380px; min-width: 300px; min-height: 0; border-left: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
+.panel-tabs { display: flex; align-items: center; gap: 20px; padding: 16px 24px 0; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.panel-tabs button { height: 34px; border-bottom: 2px solid transparent; color: var(--text-3); font-weight: 600; }
+.panel-tabs button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--text); }
+.panel-view { flex: 1; overflow-y: auto; display: none; flex-direction: column; }
+.panel-view.show { display: flex; }
+.section-head { display: flex; align-items: center; justify-content: space-between; }
+.queue { padding: 22px 16px 12px; border-bottom: 1px solid var(--line); }
+.queue .section-head { padding: 0 8px 10px; }
+.queue-meta { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--text-3); }
+.queue-list { display: flex; flex-direction: column; gap: 2px; }
+.q-item { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: var(--radius); text-align: left; width: 100%; }
+.q-item:hover { background: var(--bg-hover); }
+.q-item .tile { width: 40px; height: 40px; }
+.q-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.q-title { font-weight: 500; }
+.q-artist, .q-dur { font-size: 12px; color: var(--text-3); }
+.queue-more { display: block; padding: 10px 8px 0; font-size: 13px; color: var(--text-2); }
+.viz { padding: 20px 24px 0; display: flex; flex-direction: column; gap: 18px; }
+.live { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--accent); }
+.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.live.paused { color: var(--text-3); }
+.well { border-radius: 12px; background: var(--bg-well); overflow: hidden; }
+.well svg { display: block; width: 100%; height: 100%; }
+.caption { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
+.caption.axis { border-top: 1px solid var(--line); padding-top: 6px; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.spectrum { height: 88px; display: flex; align-items: flex-end; gap: 3px; overflow: hidden; }
+.spectrum span { flex: 1; min-width: 0; height: 4px; border-radius: 2px 2px 0 0; background: var(--text); }
+.spectrum span.peak { background: var(--accent); }
+.now { padding: 24px; margin-top: auto; display: flex; flex-direction: column; gap: 16px; }
+.now-row { display: flex; gap: 14px; align-items: center; }
+.now-row .tile { width: 56px; height: 56px; border-radius: 10px; }
+.now-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.now-title { font-size: 16px; font-weight: 600; }
+.now-artist { font-size: 13px; color: var(--text-2); }
+.now-tech { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.scrub { height: 44px; display: flex; align-items: center; gap: 2px; cursor: pointer; }
+.scrub span { flex: 1; min-width: 0; border-radius: 2px; background: var(--line-strong); }
+.scrub span.played { background: var(--text); }
+
+/* ---------- EQ ---------- */
+.eq-view { gap: 20px; padding: 20px 24px 24px; }
+.eq-controls { display: flex; align-items: center; gap: 12px; }
+.switch { height: 28px; padding: 0 10px 0 7px; border-radius: 14px; border: 1px solid var(--line); color: var(--text-3); font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; }
+.switch::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted-2); }
+.switch[aria-pressed="true"] { background: var(--bg-hover); color: var(--text); border-color: var(--line-strong); }
+.switch[aria-pressed="true"]::before { background: var(--accent); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.eq-curve { height: 96px; }
+.bands { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
+.band { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.band .val { font-size: 11px; color: var(--text-3); }
+.band .val.set { color: var(--text); }
+.band .hz { font-size: 11px; color: var(--text-3); }
+input.eq { height: 150px; width: 24px; writing-mode: vertical-lr; direction: rtl; appearance: none; -webkit-appearance: none; background: transparent; margin: 0; cursor: pointer; }
+input.eq::-webkit-slider-runnable-track { inline-size: 100%; block-size: 4px; border-radius: 2px; background: var(--line); }
+input.eq::-moz-range-track { inline-size: 100%; block-size: 4px; border-radius: 2px; background: var(--line); }
+input.eq::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--text); margin-block-start: -6px; }
+input.eq::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--text); border: 0; }
+input.eq:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.eq-off .eq-curve path { stroke: var(--muted-2); fill: var(--muted-2); }
+.preamp { display: flex; justify-content: space-between; padding-top: 4px; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-2); }
+.preamp b { color: var(--text); font-weight: 500; }
+.note { margin: 0; font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
+/* ---------- Player bar ---------- */
+.player { min-height: 88px; flex-shrink: 0; display: flex; align-items: center; gap: 24px; padding: 10px 24px; border-top: 1px solid var(--line); background: var(--bg-raised); flex-wrap: wrap; }
+.player-left { display: flex; align-items: center; gap: 12px; flex: 1 1 220px; min-width: 0; }
+.player-left .tile { width: 48px; height: 48px; border-radius: 10px; }
+.player-left .now-text .now-title { font-size: 14px; font-weight: 500; }
+.player-left .now-text .now-artist { font-size: 12px; color: var(--text-3); }
+.player-center { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 2 1 420px; min-width: 0; }
+.transport { display: flex; align-items: center; gap: 8px; }
+.transport .play { width: 42px; height: 42px; border-radius: 50%; background: var(--text); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; margin: 0 6px; }
+.transport .play:hover { filter: brightness(1.08); }
+.progress { display: flex; align-items: center; gap: 12px; width: 100%; max-width: 600px; font-size: 12px; color: var(--text-3); }
+.progress time { width: 36px; }
+.progress time:first-child { text-align: right; }
+.bar { flex: 1; height: 4px; border-radius: 2px; background: var(--line); cursor: pointer; }
+.bar-fill { height: 4px; border-radius: 2px; background: var(--text); position: relative; width: 0; }
+.bar-fill::after { content: ""; position: absolute; right: -6px; top: -4px; width: 12px; height: 12px; border-radius: 50%; background: var(--text); }
+.player-right { display: flex; align-items: center; gap: 4px; flex: 1 1 220px; justify-content: flex-end; }
+.volume { width: 96px; height: 4px; border-radius: 2px; background: var(--line); margin: 0 6px; }
+.volume div { width: 70%; height: 4px; border-radius: 2px; background: var(--text-2); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="wordmark">Resonance</div>
+    <nav aria-label="History">
+      <button class="icon-btn" aria-label="Back"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg></button>
+      <button class="icon-btn" aria-label="Forward"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"/></svg></button>
+    </nav>
+    <form class="search" role="search" onsubmit="return false">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#948D82" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <label for="search" class="sr-only">Search</label>
+      <input id="search" type="search" placeholder="Search your library">
+      <kbd>⌘K</kbd>
+    </form>
+    <div class="topbar-right">
+      <a href="#">Discover</a>
+      <a href="#">Radio</a>
+      <button class="avatar" aria-label="Account">P</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <aside class="library">
+      <div class="library-head">
+        <h2>Library</h2>
+        <button class="ghost">+ New</button>
+      </div>
+      <div class="library-tabs">
+        <button class="pill on">Playlists</button>
+        <button class="pill" style="border-color: transparent">Albums</button>
+        <button class="pill" style="border-color: transparent">Artists</button>
+      </div>
+      <nav class="library-list" id="playlists" aria-label="Playlists"></nav>
+    </aside>
+
+    <main class="main">
+      <div class="hero">
+        <div class="hero-art" aria-hidden="true">
+          <svg width="136" height="56" viewBox="0 0 140 56" fill="none" stroke="#EFE9DE" stroke-width="3" stroke-linecap="round"><path d="M3 32v4M11 26v16M19 18v28M27 24v18M35 10v40M43 20v22M51 28v12M59 14v34M67 22v20M75 30v8M83 16v30M91 24v16M99 8v44M107 20v22M115 28v10M123 18v26M131 26v12M139 30v6"/></svg>
+        </div>
+        <div class="hero-text">
+          <span class="eyebrow">Playlist · Pinned</span>
+          <h1>Favourites</h1>
+          <div class="hero-meta"><strong>pid</strong><span class="dot">·</span><span>871 songs</span><span class="dot">·</span><span>56 h 13 m</span><span class="dot">·</span><span>updated 2 days ago</span></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="play-main" data-toggle>
+          <svg class="ic-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+          <svg class="ic-play hidden" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
+          <span data-play-label>Pause</span>
+        </button>
+        <button class="icon-btn lg" aria-label="Shuffle"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+        <button class="icon-btn lg" aria-label="Download for offline"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M4 19h16"/></svg></button>
+        <button class="icon-btn lg" aria-label="More"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/></svg></button>
+        <span class="spacer"></span>
+        <button class="ghost">Recently added ▾</button>
+      </div>
+
+      <div class="chips" id="genres"></div>
+
+      <div class="tracks">
+        <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Added</span><span class="end">Time</span></div>
+        <div class="track-list" id="tracks"></div>
+      </div>
+    </main>
+
+    <aside class="panel">
+      <div class="panel-tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-tab="now">Now playing</button>
+        <button role="tab" aria-selected="false" data-tab="eq">Equalizer</button>
+      </div>
+
+      <div class="panel-view show" data-view="now">
+        <section class="queue" aria-label="Queue">
+          <div class="section-head">
+            <h2>Up next</h2>
+            <span class="queue-meta"><span id="queue-count"></span><button class="ghost">Clear</button></span>
+          </div>
+          <div class="queue-list" id="queue"></div>
+          <a href="#" class="queue-more" id="queue-more"></a>
+        </section>
+
+        <section class="viz" aria-label="Live visualizer">
+          <div class="section-head"><h2>Live</h2><span class="live" id="live">Listening</span></div>
+          <div class="stack">
+            <div class="well" style="height: 128px">
+              <svg viewBox="0 0 320 100" preserveAspectRatio="none" role="img" aria-label="Live waveform">
+                <line x1="0" y1="50" x2="320" y2="50" stroke="#2D2925"/>
+                <path id="wave-back" fill="none" stroke="#4E4740" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path id="wave" fill="none" stroke="#EFE9DE" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+            <div class="caption"><span>Waveform</span><span>Stereo · 48 kHz</span></div>
+          </div>
+          <div class="stack">
+            <div class="spectrum" id="spectrum"></div>
+            <div class="caption axis"><span>60</span><span>250</span><span>1k</span><span>4k</span><span>12k</span></div>
+          </div>
+        </section>
+
+        <section class="now" aria-label="Now playing">
+          <div class="now-row">
+            <span class="tile" data-now-tile></span>
+            <span class="now-text">
+              <span class="now-title truncate" data-now-title></span>
+              <span class="now-artist truncate" data-now-artist></span>
+              <span class="now-tech">Lossless · <span id="bpm"></span> bpm · peak <span id="peak">−6.2</span> dB</span>
+            </span>
+          </div>
+          <div class="stack" style="gap: 6px">
+            <div class="scrub" id="scrub" title="Seek"></div>
+            <div class="caption"><span data-elapsed>0:00</span><span>−<span data-remaining>0:00</span></span></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="panel-view eq-view" data-view="eq" id="eq-view">
+        <div class="section-head">
+          <h2>Equalizer</h2>
+          <span class="eq-controls">
+            <button class="ghost" id="eq-reset">Reset</button>
+            <button class="switch" id="eq-toggle" aria-pressed="true">On</button>
+          </span>
+        </div>
+        <div class="presets" id="presets"></div>
+        <div class="stack">
+          <div class="well eq-curve">
+            <svg viewBox="0 0 320 96" preserveAspectRatio="none" role="img" aria-label="Equalizer response curve">
+              <line x1="0" y1="48" x2="320" y2="48" stroke="#2D2925"/>
+              <path id="eq-fill" fill="#E8865F" opacity="0.16"/>
+              <path id="eq-line" fill="none" stroke="#E8865F" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+            </svg>
+          </div>
+          <div class="caption"><span id="preset-name">Flat</span><span>±12 dB</span></div>
+        </div>
+        <div class="bands" id="bands"></div>
+        <div class="preamp"><span>Preamp</span><b id="preamp">0 dB</b></div>
+        <p class="note">Applies to this device. Your settings save automatically.</p>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="player">
+    <div class="player-left">
+      <span class="tile" data-now-tile></span>
+      <span class="now-text">
+        <span class="now-title truncate" data-now-title></span>
+        <span class="now-artist truncate" data-now-artist></span>
+      </span>
+      <button class="icon-btn" aria-label="Save to library"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg></button>
+    </div>
+    <div class="player-center">
+      <div class="transport">
+        <button class="icon-btn" aria-label="Shuffle"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+        <button class="icon-btn" aria-label="Previous" id="prev"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.5 12.9a1 1 0 0 1 0-1.8l7.95-5.73A1 1 0 0 1 19 6.2z"/></svg></button>
+        <button class="play" data-toggle aria-label="Pause">
+          <svg class="ic-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+          <svg class="ic-play hidden" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 8 4.5z"/></svg>
+        </button>
+        <button class="icon-btn" aria-label="Next" id="next"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="16" y="5" width="3" height="14" rx="1"/><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l7.95-5.73a1 1 0 0 0 0-1.8L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg></button>
+        <button class="icon-btn" aria-label="Repeat"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></button>
+      </div>
+      <div class="progress">
+        <time data-elapsed>0:00</time>
+        <div class="bar" id="bar"><div class="bar-fill" id="bar-fill"></div></div>
+        <time data-total>0:00</time>
+      </div>
+    </div>
+    <div class="player-right">
+      <button class="icon-btn" aria-label="Lyrics"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 11h10M4 16h16M4 21h8"/></svg></button>
+      <button class="icon-btn" aria-label="Queue" style="color: var(--text)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h10M18 12v7M15 16l3 3 3-3"/></svg></button>
+      <button class="icon-btn" aria-label="Output device"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8"/></svg></button>
+      <button class="icon-btn" aria-label="Volume"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></button>
+      <div class="volume"><div></div></div>
+      <button class="icon-btn" aria-label="Full screen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5"/></svg></button>
+    </div>
+  </footer>
+</div>
+
+<script>
+/* =========================================================
+   Resonance UI — vanilla JS.
+   The visualizer and EQ are SIMULATED. To wire real audio:
+   1. Create an AudioContext + MediaElementSource for your <audio>.
+   2. Build 10 BiquadFilterNodes (type 'peaking', frequency = BANDS[i], Q ≈ 1.4)
+      in series and set .gain.value from state.eq when sliders move.
+   3. Put an AnalyserNode (fftSize 2048) at the end, then call
+      Visualizer.attach(analyser) — the loop below switches from simulation
+      to getByteTimeDomainData / getByteFrequencyData automatically.
+   ========================================================= */
+
+const TRACKS = [
+  { id: 1, title: 'Low Tide',          artist: 'Mira Vale',        album: 'Saltwater',          added: '2 days ago',  secs: 311, tile: '#5E5272' },
+  { id: 2, title: 'Night Bus Home',    artist: 'Kaito & June',     album: 'Transit',            added: '4 days ago',  secs: 247, tile: '#4F6472' },
+  { id: 3, title: 'Static Bloom',      artist: 'Halvard',          album: 'The Great Southern', added: '1 week ago',  secs: 420, tile: '#6F4848' },
+  { id: 4, title: 'How Are You, Dear', artist: 'Dian Jeremi',      album: 'How Are You, Dear',  added: '1 week ago',  secs: 190, tile: '#445E52' },
+  { id: 5, title: 'Drop Sequence',     artist: 'silver seraph',    album: 'Drop Sequence',      added: '2 weeks ago', secs: 101, tile: '#59534C' },
+  { id: 6, title: 'Heart Rate',        artist: 'Reddish',          album: 'Pulse EP',           added: '2 weeks ago', secs: 162, tile: '#735E4E' },
+  { id: 7, title: 'Glass Weather',     artist: 'Noor Alami',       album: 'Glass Weather',      added: '3 weeks ago', secs: 238, tile: '#535F6A' },
+  { id: 8, title: 'Second Spring',     artist: 'The Orchard Line', album: 'Field Notes',        added: '1 month ago', secs: 266, tile: '#7D6D43' },
+];
+const PLAYLISTS = [
+  { name: 'if six was nine', owner: 'pid',    tile: '#59534C', count: 64 },
+  { name: 'late drives',     owner: 'pid',    tile: '#5E5272', count: 31 },
+  { name: 'indo',            owner: 'pid',    tile: '#735E4E', count: 118 },
+  { name: 'number nine',     owner: 'pid',    tile: '#445E52', count: 27 },
+  { name: 'Favourites',      owner: 'pid',    tile: '#221E1A', count: 871, active: true },
+  { name: 'Azamsky',         owner: 'Fabill', tile: '#4F6472', count: 42 },
+  { name: 'sing',            owner: 'pid',    tile: '#6F4848', count: 19 },
+  { name: 'daredevil',       owner: 'pid',    tile: '#535F6A', count: 55 },
+  { name: 'study focus',     owner: 'pid',    tile: '#7D6D43', count: 88 },
+];
+const GENRES = ['Rock', 'Pop', 'Chill', 'Beats', 'Nostalgia', 'Anime', 'Hip Hop', 'Smooth', 'Indie', 'Soundtrack'];
+const BANDS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const BAND_LABELS = ['32', '64', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
+const PRESETS = [
+  { name: 'Flat',        g: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: 'Bass boost',  g: [6, 5, 4, 2, 0, 0, 0, 0, 0, 0] },
+  { name: 'Vocal',       g: [-2, -1, 0, 1, 3, 4, 3, 1, 0, -1] },
+  { name: 'Acoustic',    g: [3, 2, 1, 0, 1, 2, 3, 3, 2, 1] },
+  { name: 'Electronic',  g: [4, 3, 0, -1, -2, 0, 1, 3, 4, 4] },
+  { name: 'Late night',  g: [-3, -2, 0, 1, 2, 2, 1, 0, -2, -4] },
+];
+const BAR_COUNT = 48;
+
+const state = {
+  playing: true, nowId: 1, pos: 0.42, genre: 'Chill', tab: 'now',
+  eq: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], eqOn: true, preset: 'Flat',
+};
+
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const fmt = s => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const now = () => TRACKS.find(t => t.id === state.nowId) || TRACKS[0];
+
+/* ---------- Static lists ---------- */
+function renderPlaylists() {
+  $('#playlists').innerHTML = PLAYLISTS.map((p, i) => `
+    <button class="pl ${p.active ? 'active' : ''}" data-i="${i}">
+      <span class="tile" style="background:${p.tile}"></span>
+      <span class="pl-text"><span class="pl-name truncate">${p.name}</span><span class="pl-meta">${p.owner}</span></span>
+      <span class="pl-count">${p.count}</span>
+    </button>`).join('');
+  $$('.pl').forEach(b => b.onclick = () => { $$('.pl').forEach(x => x.classList.remove('active')); b.classList.add('active'); });
+}
+function renderGenres() {
+  $('#genres').innerHTML = GENRES.map(g => `<button class="pill ${g === state.genre ? 'on' : ''}" data-g="${g}">${g}</button>`).join('');
+  $$('#genres .pill').forEach(b => b.onclick = () => { state.genre = b.dataset.g; renderGenres(); });
+}
+function renderTracks() {
+  $('#tracks').innerHTML = TRACKS.map((t, i) => `
+    <button class="track track-grid ${t.id === state.nowId ? 'active' : ''}" data-id="${t.id}">
+      <span class="num">${t.id === state.nowId ? '▶' : i + 1}</span>
+      <span class="t-cell"><span class="tile" style="background:${t.tile}"></span>
+        <span class="t-text"><span class="t-title truncate">${t.title}</span><span class="t-artist">${t.artist}</span></span></span>
+      <span class="t-album truncate">${t.album}</span>
+      <span class="t-added">${t.added}</span>
+      <span class="t-dur end">${fmt(t.secs)}</span>
+    </button>`).join('');
+  $$('.track').forEach(b => b.onclick = () => play(+b.dataset.id));
+}
+function renderQueue() {
+  const up = TRACKS.filter(t => t.id !== state.nowId);
+  $('#queue-count').textContent = `${up.length} songs`;
+  $('#queue-more').textContent = `${Math.max(0, up.length - 4)} more in queue`;
+  $('#queue').innerHTML = up.slice(0, 4).map(t => `
+    <button class="q-item" data-id="${t.id}">
+      <span class="tile" style="background:${t.tile}"></span>
+      <span class="q-text"><span class="q-title truncate">${t.title}</span><span class="q-artist">${t.artist}</span></span>
+      <span class="q-dur">${fmt(t.secs)}</span>
+    </button>`).join('');
+  $$('.q-item').forEach(b => b.onclick = () => play(+b.dataset.id));
+}
+function renderNow() {
+  const t = now();
+  $$('[data-now-tile]').forEach(e => e.style.background = t.tile);
+  $$('[data-now-title]').forEach(e => e.textContent = t.title);
+  $$('[data-now-artist]').forEach(e => e.textContent = t.artist);
+  $$('[data-total]').forEach(e => e.textContent = fmt(t.secs));
+  $('#bpm').textContent = 92 + (t.id * 7) % 50;
+  renderTracks(); renderQueue();
+}
+function renderPlayState() {
+  $$('.ic-pause').forEach(e => e.classList.toggle('hidden', !state.playing));
+  $$('.ic-play').forEach(e => e.classList.toggle('hidden', state.playing));
+  $('[data-play-label]').textContent = state.playing ? 'Pause' : 'Play';
+  $('.transport .play').setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+  const live = $('#live'); live.textContent = state.playing ? 'Listening' : 'Paused'; live.classList.toggle('paused', !state.playing);
+}
+function renderProgress() {
+  const t = now(), el = state.pos * t.secs;
+  $$('[data-elapsed]').forEach(e => e.textContent = fmt(el));
+  $$('[data-remaining]').forEach(e => e.textContent = fmt(t.secs - el));
+  $('#bar-fill').style.width = (state.pos * 100).toFixed(2) + '%';
+  const played = Math.floor(state.pos * 72);
+  $$('#scrub span').forEach((s, i) => s.classList.toggle('played', i < played));
+}
+function play(id) { state.nowId = id; state.pos = 0; state.playing = true; renderNow(); renderPlayState(); renderProgress(); }
+function toggle() { state.playing = !state.playing; renderPlayState(); }
+function step(dir) { const i = TRACKS.findIndex(t => t.id === state.nowId); play(TRACKS[(i + dir + TRACKS.length) % TRACKS.length].id); }
+
+/* Scrubber waveform: precomputed "peaks" (seeded so it is stable) */
+(function buildScrub() {
+  let seed = 7; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const el = $('#scrub');
+  el.innerHTML = Array.from({ length: 72 }, (_, i) => {
+    const env = Math.sin(Math.PI * (i + 1) / 73);
+    const v = 0.2 + 0.8 * (0.45 * env + 0.55 * rnd());
+    return `<span style="height:${Math.round(4 + v * 40)}px"></span>`;
+  }).join('');
+  el.onclick = e => { const r = el.getBoundingClientRect(); state.pos = (e.clientX - r.left) / r.width; renderProgress(); };
+  const bar = $('#bar');
+  bar.onclick = e => { const r = bar.getBoundingClientRect(); state.pos = (e.clientX - r.left) / r.width; renderProgress(); };
+})();
+
+/* ---------- Visualizer loop ---------- */
+const Visualizer = (() => {
+  const spectrum = $('#spectrum');
+  spectrum.innerHTML = Array.from({ length: BAR_COUNT }, () => '<span></span>').join('');
+  const bars = $$('#spectrum span');
+  const wave = $('#wave'), waveBack = $('#wave-back'), peakEl = $('#peak');
+  let analyser = null, freq = null, time = null, t = 0, last = 0;
+
+  function attach(node) { analyser = node; freq = new Uint8Array(node.frequencyBinCount); time = new Uint8Array(node.fftSize); }
+
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (!state.playing) { last = ts; return; }
+    if (last && ts - last < 32) return;               // ~30 fps is plenty for DOM bars
+    const dt = last ? Math.min(ts - last, 100) : 16;
+    last = ts; t += dt / 1000;
+
+    // advance playback position (replace with <audio>.currentTime when wired)
+    state.pos += (dt / 1000) / now().secs; if (state.pos >= 1) state.pos = 0;
+    renderProgress();
+
+    let peak = 0;
+    if (analyser) {
+      analyser.getByteFrequencyData(freq);
+      analyser.getByteTimeDomainData(time);
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // log-spaced bin pick so lows don't hog the display
+        const bin = Math.min(freq.length - 1, Math.floor(Math.pow(freq.length, i / BAR_COUNT)));
+        const v = freq[bin] / 255; peak = Math.max(peak, v);
+        bars[i].style.height = Math.round(3 + v * 84) + 'px';
+        bars[i].classList.toggle('peak', v > 0.88);
+      }
+      let d = '';
+      for (let j = 0; j <= 64; j++) {
+        const s = time[Math.floor(j / 64 * (time.length - 1))];
+        d += (j ? ' L' : 'M') + (j / 64 * 320).toFixed(1) + ' ' + (100 - s / 255 * 100).toFixed(1);
+      }
+      wave.setAttribute('d', d); waveBack.setAttribute('d', 'M0 50 L320 50');
+    } else {
+      // simulation
+      for (let i = 0; i < BAR_COUNT; i++) {
+        const x = i / (BAR_COUNT - 1);
+        const env = 0.3 + 0.7 * Math.exp(-Math.pow((x - 0.25) * 2.4, 2));
+        let v = env * (0.55 + 0.45 * Math.sin(t * 2.3 + i * 0.42)) * (0.75 + 0.25 * Math.sin(t * 5.1 + i * 1.3)) + 0.08 * Math.random();
+        v = Math.max(0.04, Math.min(1, v)); peak = Math.max(peak, v);
+        bars[i].style.height = Math.round(3 + v * 84) + 'px';
+        bars[i].classList.toggle('peak', v > 0.88);
+      }
+      let d = '', b = '';
+      for (let j = 0; j <= 64; j++) {
+        const px = (j / 64) * 320, ph = (j / 64) * Math.PI * 2, win = Math.sin(Math.PI * j / 64);
+        const a = Math.sin(ph * 2 + t * 6) * 22 + Math.sin(ph * 5 + t * 9) * 9 + Math.sin(ph * 11 - t * 4) * 4;
+        d += (j ? ' L' : 'M') + px.toFixed(1) + ' ' + (50 - a * (0.5 + 0.5 * win)).toFixed(1);
+        b += (j ? ' L' : 'M') + px.toFixed(1) + ' ' + (50 + a * 0.45 * win).toFixed(1);
+      }
+      wave.setAttribute('d', d); waveBack.setAttribute('d', b);
+    }
+    peakEl.textContent = (-1.5 - (1 - peak) * 12).toFixed(1);
+  }
+  requestAnimationFrame(frame);
+  return { attach };
+})();
+
+/* ---------- Equalizer ---------- */
+function renderEq() {
+  $('#eq-view').classList.toggle('eq-off', !state.eqOn);
+  const tgl = $('#eq-toggle'); tgl.setAttribute('aria-pressed', state.eqOn); tgl.textContent = state.eqOn ? 'On' : 'Off';
+  $('#preset-name').textContent = state.preset;
+  $('#presets').innerHTML = PRESETS.map(p => `<button class="pill ${p.name === state.preset ? 'on' : ''}" data-p="${p.name}">${p.name}</button>`).join('');
+  $$('#presets .pill').forEach(b => b.onclick = () => { const p = PRESETS.find(x => x.name === b.dataset.p); state.eq = p.g.slice(); state.preset = p.name; renderEq(); });
+
+  if (!$('#bands').children.length) {
+    $('#bands').innerHTML = BAND_LABELS.map((l, i) => `
+      <div class="band">
+        <span class="val" data-val="${i}">0</span>
+        <label class="sr-only" for="eq-${i}">${BANDS[i]} Hz gain</label>
+        <input class="eq" id="eq-${i}" type="range" min="-12" max="12" step="1" value="0" data-i="${i}">
+        <span class="hz">${l}</span>
+      </div>`).join('');
+    $$('input.eq').forEach(inp => inp.oninput = () => { state.eq[+inp.dataset.i] = +inp.value; state.preset = 'Custom'; renderEq(); });
+  }
+  state.eq.forEach((g, i) => {
+    const inp = $(`#eq-${i}`); if (+inp.value !== g) inp.value = g;
+    const v = $(`[data-val="${i}"]`); v.textContent = g > 0 ? `+${g}` : g < 0 ? `−${-g}` : '0'; v.classList.toggle('set', g !== 0);
+  });
+
+  // response curve: smooth cubic through the 10 points
+  const pts = state.eq.map((g, i) => [16 + i * 32, 48 - g * 3]);
+  let d = `M0 ${pts[0][1]} L${pts[0][0]} ${pts[0][1]}`;
+  for (let k = 1; k < pts.length; k++) { const [qx, qy] = pts[k - 1], [px, py] = pts[k], mx = (qx + px) / 2; d += ` C${mx} ${qy} ${mx} ${py} ${px} ${py}`; }
+  d += ` L320 ${pts[9][1]}`;
+  $('#eq-line').setAttribute('d', d);
+  $('#eq-fill').setAttribute('d', d + ' L320 48 L0 48 Z');
+  const max = Math.max(...state.eq);
+  $('#preamp').textContent = (max > 0 ? `−${max}` : '0') + ' dB';
+  // Hook: apply state.eq to your BiquadFilterNodes here.
+}
+$('#eq-toggle').onclick = () => { state.eqOn = !state.eqOn; renderEq(); };
+$('#eq-reset').onclick = () => { state.eq = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; state.preset = 'Flat'; renderEq(); };
+
+/* ---------- Panel tabs ---------- */
+$$('.panel-tabs [data-tab]').forEach(b => b.onclick = () => {
+  state.tab = b.dataset.tab;
+  $$('.panel-tabs [data-tab]').forEach(x => x.setAttribute('aria-selected', x === b));
+  $$('.panel-view').forEach(v => v.classList.toggle('show', v.dataset.view === state.tab));
+});
+
+/* ---------- Wire up ---------- */
+$$('[data-toggle]').forEach(b => b.onclick = toggle);
+$('#prev').onclick = () => step(-1);
+$('#next').onclick = () => step(1);
+renderPlaylists(); renderGenres(); renderNow(); renderPlayState(); renderProgress(); renderEq();
+</script>
+</body>
+</html>
