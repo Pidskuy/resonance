@@ -17,6 +17,7 @@ This file holds every decision made during planning. If something here needs to 
 ### Audio quality rules (the core promise)
 
 1. **Sample-rate matching.** When a track plays, the output device (your DAC) is switched to that track's sample rate (44.1 / 48 / 88.2 / 96 / 176.4 / 192 kHz). macOS must not resample.
+   - **If the device can't run at the file's rate** (e.g. built-in speakers with a 96k or 192k file): play it anyway and let macOS convert the rate, with the bit-perfect badge **off**. Our own code still never resamples. The app checks the device's actual rate after opening the stream to know which case it's in. *(Decided 2026-11-15.)*
 2. **Untouched signal.** When the volume is at 100% and the EQ is off, the samples reach the DAC unchanged.
 3. **Bit-perfect badge.** A small badge next to the format label (e.g. `FLAC · 24/96`) lights up only when all three are true: device rate = file rate, volume = 100%, EQ off.
 4. **Not in scope:** exclusive "hog" mode (other apps can still play sound) and DSD.
@@ -113,6 +114,7 @@ A small script generates test files with numpy + soundfile: sine tones at 44.1k/
 ### Slice 2: Play one file at native rate (no UI)
 A command-line script: list output devices, pick one, play a file. The stream opens at the file's sample rate with `change_device_parameters=True`.
 **Done when:** playing the 96k file makes **Audio MIDI Setup** (and your DAC's indicator) show 96 kHz, then 44.1k for the 44.1k file.
+*On the MacBook Air speakers (DAC on loan):* they support 44.1/48/88.2/96 kHz, so the 96k → 44.1k test works as written. The 192k file must still play, with the script saying macOS is converting it (speakers stay at 96k). Repeat the 192k test once the DAC is back.
 
 ### Slice 3: Engine controls
 Engine class with play / pause / resume / stop / seek, plus current position and duration. Decoder thread + ring buffer as described above.
