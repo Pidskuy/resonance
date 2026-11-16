@@ -129,7 +129,8 @@ Choose a music folder → scan → read tags and album art with mutagen → stor
 **Done when:** your test folder (and later real music) shows up correctly, and rescanning an unchanged folder is fast.
 
 ### Slice 6: Queue & transport
-Up Next queue, next / previous, shuffle, repeat (off / all / one), click a track to play from there (single click: user's choice, 2026-11-15).
+Up Next queue, next / previous, shuffle, repeat (off / all / one), click a track to play from there (single click: user's choice, 2026-11-15). **Add to queue** with the + on each song or by right-clicking it. Added songs go to the **top** of Up next, ahead of the playlist, in the order you added them; the same song can be added any number of times; **drag** songs in Up next to reorder them; songs you added stay on top when you start another list. *(User's requests, 2026-11-16; replaces an earlier "Play next" option.)*
+*Layout (user's requests, 2026-11-16):* the right panel keeps the design's **Now playing | Equalizer** tabs, with Up next, Live and Now playing together. Up next lists the **whole** queue in its own scrolling box that takes the panel's spare height, with small "Next in queue" / "Next from: <list>" / "Then from the start" labels (modelled on Spotify). In the song list, a compact bar (play button + list name) and the column headings stick to the top while scrolling (also modelled on Spotify). Each column (library, songs, right panel) scrolls on its own.
 **Done when:** the queue panel matches what actually plays next, in every mode.
 
 ### Slice 7: Gapless + rate switching

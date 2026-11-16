@@ -216,3 +216,66 @@ button:disabled:hover { color: inherit; }
 .welcome { padding: 72px 48px; display: flex; flex-direction: column; align-items: flex-start; gap: 16px; max-width: 640px; }
 .welcome h1 { margin: 0; font-family: var(--font-display); font-variation-settings: 'SOFT' 100, 'opsz' 144; font-weight: 400; font-size: 52px; line-height: 1; letter-spacing: -0.02em; }
 .welcome p { margin: 0 0 8px; color: var(--text-2); line-height: 1.5; }
+.icon-btn.on, .icon-btn.on:hover { color: var(--accent); }
+.icon-btn.repeat { position: relative; }
+.icon-btn .badge { position: absolute; top: 5px; right: 4px; font-size: 9px; font-weight: 700; line-height: 1; color: var(--accent); }
+button.queue-more { text-align: left; }
+.queue .empty { padding: 4px 8px 8px; }
+
+/* ---------- Play next / Add to queue ---------- */
+.track { cursor: pointer; }
+.track:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.track .t-dur { display: flex; align-items: center; gap: 10px; }
+.add-btn { width: 24px; height: 24px; border-radius: 12px; font-size: 16px; line-height: 1; color: var(--text-2); opacity: 0; }
+.track:hover .add-btn, .track.menu-open .add-btn, .add-btn:focus-visible { opacity: 1; }
+.add-btn:hover { background: var(--line); color: var(--text); }
+.menu-anchor { position: fixed; z-index: 30; }
+.add-menu { display: flex; flex-direction: column; width: 170px; padding: 6px; border-radius: var(--radius); border: 1px solid var(--line-strong); background: var(--bg-raised); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+.add-menu button { padding: 8px 10px; border-radius: 6px; text-align: left; font-size: 13px; color: var(--text); white-space: nowrap; }
+.add-menu button:hover { background: var(--bg-hover); }
+.toast { position: fixed; left: 50%; bottom: 104px; transform: translateX(-50%); z-index: 20; padding: 10px 16px; border-radius: 20px; background: var(--text); color: var(--bg); font-size: 13px; font-weight: 500; }
+
+/* ---------- Dragging in Up next ---------- */
+.q-item { cursor: pointer; }
+.q-item[draggable="true"] { cursor: grab; }
+.q-item.dragging { opacity: 0.4; }
+.q-item.drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+.q-item.drop-below { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* ---------- Each column scrolls on its own ----------
+   The design wraps columns (flex-wrap: wrap) for narrow screens. With wrapping, each
+   column grows as tall as its content, so the whole middle area scrolled as one block.
+   The window is never narrower than 1024 px, so we turn wrapping off: every column is
+   then exactly as tall as the window and scrolls by itself. */
+.body { flex-wrap: nowrap; overflow: hidden; }
+
+/* The song table: room for the + button next to the time, and no sideways
+   scrolling in a narrow window (the Album column is hidden below 1200 px). */
+.track-grid { grid-template-columns: 32px minmax(220px, 1.6fr) minmax(140px, 1fr) 120px 84px; }
+@media (max-width: 1200px) {
+  .track-grid { grid-template-columns: 32px minmax(0, 1fr) 110px 84px; min-width: 0; }
+  .track-list { min-width: 0; }
+  .track-head > span:nth-child(3), .track .t-album { display: none; }
+}
+
+/* ---------- Now playing tab: Up next scrolls in its own box ----------
+   The tab is a vertical flex column. Up next takes all the spare height (flex: 1,
+   never less than 260 px) and its list scrolls inside; Live and Now playing below
+   keep their natural size. If the window is very short, the whole tab scrolls too. */
+.now-view.show { display: flex; flex-direction: column; overflow-y: auto; }
+.now-view .queue { flex: 1 1 auto; display: flex; flex-direction: column; }
+.now-view .queue-list { flex: 1 1 0; min-height: 290px; overflow-y: auto; }   /* at least 4 songs tall, labels included */
+.now-view .viz, .now-view .now { flex: none; }
+.q-label { margin: 10px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); }
+.queue-list > div:first-child .q-label { margin-top: 0; }
+
+/* ---------- Sticky compact bar + column headings (Spotify-style) ---------- */
+/* "position: sticky" keeps an element in view while the content around it scrolls.
+   margin-bottom: -64px makes the bar take up no room until it's shown. */
+.compact-bar { position: sticky; top: 0; z-index: 6; height: 64px; margin-bottom: -64px; display: flex; align-items: center; gap: 14px; padding: 0 24px; background: var(--bg-raised); border-bottom: 1px solid var(--line); opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+.compact-bar.show { opacity: 1; pointer-events: auto; }
+.compact-title { font-family: var(--font-display); font-variation-settings: 'SOFT' 100, 'opsz' 48; font-size: 24px; font-weight: 500; }
+.play-round { width: 40px; height: 40px; flex-shrink: 0; border-radius: 50%; background: var(--accent); color: var(--bg); display: inline-flex; align-items: center; justify-content: center; }
+.play-round:hover { filter: brightness(1.08); }
+.tracks { overflow: visible; }                       /* sticky needs this: no scroll box in between */
+.tracks .track-head { position: sticky; top: 64px; z-index: 5; background: var(--bg); }

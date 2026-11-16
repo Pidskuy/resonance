@@ -46,6 +46,16 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('player', () => ({
     // ---- data ----
     library: { folders: [], tracks: [], albums: [], artists: [] },
+    byId: {},                // track id → track, for turning queue ids into songs
+    queue: { up_next: [], count: 0, draggable: 0, queued: 0, from: '', shuffle: false, repeat: 'off' },   // from Python
+    queueSnapshot: '',       // the last queue as text, to skip redrawing when nothing changed
+    scrolled: false,         // song list scrolled past the big header → show the compact bar
+    menu: null,              // the right-click menu: null (closed) or { track, x, y }
+    drag: { from: null, over: null },   // which Up next song is being dragged, and over which
+    scrollSpeed: 0,          // while dragging near the queue box's edge: pixels to scroll per tick
+    scrollTimer: null,
+    notice: '',              // short message at the bottom, e.g. "Denial will play next"
+    noticeTimer: null,
     view: 'albums',          // sidebar tab: "albums" | "artists"
     selected: null,          // null = all songs, or { kind: 'album'|'artist', name }
     current: null,           // the loaded track (from Python), or null
@@ -83,6 +93,7 @@ document.addEventListener('alpine:init', () => {
       const list = s.kind === 'album' ? this.library.albums : this.library.artists;
       return list.find(x => x.name === s.name) || null;
     },
+    get upNext() { return this.queue.up_next.map(id => this.byId[id]).filter(Boolean); },
     get heroEyebrow() { return !this.selected ? 'Library' : this.selected.kind === 'album' ? 'Album' : 'Artist'; },
     get heroTitle() { return this.selected ? this.selected.name : 'All songs'; },
     get heroMeta() {
@@ -95,8 +106,13 @@ document.addEventListener('alpine:init', () => {
     // ---- start-up: Alpine runs init() automatically ----
     async init() {
       await pythonReady();
-      this.library = await window.pywebview.api.get_library();
+      this.setLibrary(await window.pywebview.api.get_library());
       setInterval(() => this.poll(), POLL_MS);
+    },
+
+    setLibrary(lib) {
+      this.library = lib;
+      this.byId = Object.fromEntries(lib.tracks.map(t => [t.id, t]));
     },
 
     async poll() {
@@ -109,6 +125,11 @@ document.addEventListener('alpine:init', () => {
       this.state = s.state;
       this.position = s.position;
       this.current = s.track;
+      const snapshot = JSON.stringify(s.queue);
+      if (snapshot !== this.queueSnapshot) {      // only redraw the queue if it changed
+        this.queueSnapshot = snapshot;
+        this.queue = s.queue;
+      }
     },
 
     /** Run a Python call that changes playback, ignoring polls meanwhile. */
@@ -128,7 +149,7 @@ document.addEventListener('alpine:init', () => {
       try {
         const r = await call();
         if (r.cancelled) { this.scanNote = ''; return; }
-        this.library = r.library;
+        this.setLibrary(r.library);
         const s = r.scan;
         const parts = [['new', s.added], ['updated', s.updated], ['removed', s.removed],
                        ['unchanged', s.unchanged], ['unreadable', s.failed]]
@@ -143,6 +164,21 @@ document.addEventListener('alpine:init', () => {
     },
 
     select(kind, name) { this.selected = kind ? { kind, name } : null; },
+
+    /** The song list scrolled: close the menu, and show the compact bar once the
+        big header has (almost) disappeared off the top. */
+    onMainScroll(main) {
+      this.menu = null;
+      const hero = main.querySelector('.hero');
+      this.scrolled = hero ? main.scrollTop > hero.offsetHeight - 48 : false;
+    },
+
+    /** The big Play button and the compact bar's button: pause/resume what's playing,
+        or start the list shown from its first song. */
+    heroPlay() {
+      if (this.current && this.state !== 'stopped') return this.toggle();
+      if (this.visibleTracks.length) return this.playTrack(this.visibleTracks[0].id);
+    },
 
     /** The album to show in the table: blank for songs without an album tag. */
     albumName(track) { return track.album === 'Unknown album' ? '' : track.album; },
@@ -159,7 +195,93 @@ document.addEventListener('alpine:init', () => {
     },
 
     // ---- playback actions (called from the HTML) ----
-    playTrack(id) { return this.control(() => window.pywebview.api.play_track(id)); },
+    /** Play a song, queueing the list it was clicked in (album, artist or all songs). */
+    playTrack(id) {
+      const context = this.visibleTracks.map(t => t.id);
+      return this.control(() => window.pywebview.api.play_track(id, context, this.heroTitle));
+    },
+    next() { return this.control(() => window.pywebview.api.next()); },
+    previous() { return this.control(() => window.pywebview.api.previous()); },
+    jump(i) { return this.control(() => window.pywebview.api.jump(i)); },
+    toggleShuffle() { return this.control(() => window.pywebview.api.set_shuffle(!this.queue.shuffle)); },
+    cycleRepeat() { return this.control(() => window.pywebview.api.cycle_repeat()); },
+    clearQueue() { return this.control(() => window.pywebview.api.clear_queue()); },
+    async addToQueue(track) {
+      await this.control(() => window.pywebview.api.add_to_queue(track.id));
+      this.say(`${track.title} added to the queue`);
+    },
+
+    /** Open the queue menu for a song: below the + button, or at the mouse for a right-click. */
+    openMenu(track, event, fromButton) {
+      const MENU_W = 170, MENU_H = 90;           // roughly the menu's size, to keep it on screen
+      let x = event.clientX, y = event.clientY, above = event.clientY - MENU_H;
+      if (fromButton) {
+        const box = event.currentTarget.getBoundingClientRect();
+        x = box.right - MENU_W;
+        y = box.bottom + 4;
+        above = box.top - MENU_H - 4;
+      }
+      if (y + MENU_H > window.innerHeight - 8) y = above;       // no room below: open upwards
+      x = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
+      y = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
+      this.menu = { track, x, y };
+    },
+
+    /** "Add to queue" in the right-click menu. */
+    menuChoice() {
+      const track = this.menu.track;
+      this.menu = null;
+      return this.addToQueue(track);
+    },
+
+    // ---- dragging songs in Up next ----
+    startDrag(i, event) {
+      this.drag = { from: i, over: null };
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', String(i));    // some browsers need data to start a drag
+    },
+    dragOver(i) {
+      if (this.drag.from !== null && i < this.queue.draggable) this.drag.over = i;
+    },
+    dropAt(i) {
+      const from = this.drag.from;
+      this.endDrag();
+      if (from === null || from === i || i >= this.queue.draggable) return;
+      return this.control(() => window.pywebview.api.move(from, i));
+    },
+    endDrag() {
+      this.drag = { from: null, over: null };
+      this.stopEdgeScroll();
+    },
+
+    /** While dragging: scroll the queue box when the pointer is near (or past) its top or
+        bottom edge, faster the closer it gets. Browsers don't do this for boxes inside a page. */
+    edgeScroll(event, box) {
+      if (this.drag.from === null) return;
+      const ZONE = 50, MAX = 30;                         // edge zone in px, top speed in px per tick
+                                                         // (gentle at the edge, fastest past it)
+      const b = box.getBoundingClientRect(), y = event.clientY;
+      let speed = 0;
+      if (y < b.top + ZONE) speed = -Math.min(MAX, Math.ceil((b.top + ZONE - y) / 3));
+      else if (y > b.bottom - ZONE) speed = Math.min(MAX, Math.ceil((y - (b.bottom - ZONE)) / 3));
+      this.scrollSpeed = speed;
+      if (speed === 0) return this.stopEdgeScroll();
+      if (!this.scrollTimer) {                           // ~60 nudges a second while near an edge
+        this.scrollTimer = setInterval(() => { box.scrollTop += this.scrollSpeed; }, 16);
+      }
+    },
+    stopEdgeScroll() {
+      clearInterval(this.scrollTimer);
+      this.scrollTimer = null;
+      this.scrollSpeed = 0;
+    },
+
+    /** Show a short message for 2 seconds. */
+    say(text) {
+      this.notice = text;
+      clearTimeout(this.noticeTimer);
+      this.noticeTimer = setTimeout(() => { this.notice = ''; }, 2000);
+    },
     toggle() {
       if (!this.current && this.visibleTracks.length) return this.playTrack(this.visibleTracks[0].id);
       return this.control(() => window.pywebview.api.toggle());

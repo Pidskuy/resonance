@@ -10,7 +10,7 @@
 <script defer src="vendor/alpine.min.js"></script>
 </head>
 <body>
-<div class="app" x-data="player" @keydown.space.window.prevent="toggle()">
+<div class="app" x-data="player" @keydown.space.window.prevent="toggle()" @keydown.escape.window="menu = null">
 
   <header class="topbar">
     <div class="wordmark">Resonance</div>
@@ -65,7 +65,7 @@
     </aside>
 
     <!-- ===== Main: the selected album / artist / all songs ===== -->
-    <main class="main">
+    <main class="main" @scroll="onMainScroll($el)">
       <template x-if="!library.tracks.length">
         <div class="welcome">
           <h1>Your music, at its real quality.</h1>
@@ -76,6 +76,14 @@
 
       <template x-if="library.tracks.length">
         <div>
+          <!-- Compact bar: appears at the top once the big header has scrolled away (like Spotify) -->
+          <div class="compact-bar" :class="{ show: scrolled }">
+            <button class="play-round" :aria-label="current && playing ? 'Pause' : 'Play'" @click="heroPlay()">
+              <svg x-show="current && playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+              <svg x-show="!(current && playing)" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 8 4.5z"/></svg>
+            </button>
+            <span class="compact-title truncate" x-text="heroTitle"></span>
+          </div>
           <div class="hero">
             <div class="hero-art" :style="artStyle(selectedGroup && selectedGroup.art_id)" aria-hidden="true">
               <svg x-show="!(selectedGroup && arts[selectedGroup.art_id])" width="136" height="56" viewBox="0 0 140 56" fill="none" stroke="#EFE9DE" stroke-width="3" stroke-linecap="round"><path d="M3 32v4M11 26v16M19 18v28M27 24v18M35 10v40M43 20v22M51 28v12M59 14v34M67 22v20M75 30v8M83 16v30M91 24v16M99 8v44M107 20v22M115 28v10M123 18v26M131 26v12M139 30v6"/></svg>
@@ -92,28 +100,35 @@
           </div>
 
           <div class="actions">
-            <button class="play-main" @click="current && playing ? toggle() : playTrack(visibleTracks[0].id)">
+            <button class="play-main" @click="heroPlay()">
               <svg x-show="current && playing" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
               <svg x-show="!(current && playing)" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z"/></svg>
               <span x-text="current && playing ? 'Pause' : 'Play'"></span>
             </button>
-            <button class="icon-btn lg" aria-label="Shuffle" disabled><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+            <button class="icon-btn lg" :class="{ on: queue.shuffle }" :aria-label="queue.shuffle ? 'Shuffle on' : 'Shuffle off'" @click="toggleShuffle()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
             <span class="spacer"></span>
-            <span class="ghost">Click a song to play it</span>
+            <span class="ghost">Click a song to play it · + or right-click to queue it</span>
           </div>
 
           <div class="tracks">
             <div class="track-grid track-head"><span>#</span><span>Title</span><span>Album</span><span>Format</span><span class="end">Time</span></div>
             <div class="track-list">
               <template x-for="(t, i) in visibleTracks" :key="t.id">
-                <button class="track track-grid" :class="{ active: current && current.id === t.id }" @click="playTrack(t.id)">
+                <!-- a div, not a button: a button may not contain the + button -->
+                <div class="track track-grid" role="button" tabindex="0"
+                     :class="{ active: current && current.id === t.id, 'menu-open': menu && menu.track.id === t.id }"
+                     @click="playTrack(t.id)" @keydown.enter="playTrack(t.id)"
+                     @contextmenu.prevent="openMenu(t, $event, false)">
                   <span class="num" x-text="current && current.id === t.id && playing ? '▶' : (t.track_no || i + 1)"></span>
                   <span class="t-cell"><span class="tile" :style="artStyle(t.art_id)"></span>
                     <span class="t-text"><span class="t-title truncate" x-text="t.title"></span><span class="t-artist truncate" x-text="t.artist"></span></span></span>
                   <span class="t-album truncate" x-text="albumName(t)"></span>
                   <span class="t-added" x-text="t.label"></span>
-                  <span class="t-dur end" x-text="fmt(t.duration)"></span>
-                </button>
+                  <span class="t-dur end">
+                    <button class="add-btn" aria-label="Add to queue" title="Add to queue" @click.stop="addToQueue(t)">+</button>
+                    <span x-text="fmt(t.duration)"></span>
+                  </span>
+                </div>
               </template>
             </div>
           </div>
@@ -128,10 +143,45 @@
         <button role="tab" :aria-selected="tab === 'eq'" @click="tab = 'eq'">Equalizer</button>
       </div>
 
-      <div class="panel-view" :class="{ show: tab === 'now' }">
-        <section class="queue" aria-label="Queue">
-          <div class="section-head"><h2>Up next</h2></div>
-          <p class="empty">Nothing queued yet.</p>
+      <!-- ===== Now playing tab: Up next (scrolls in its own box), Live, Now playing ===== -->
+      <div class="panel-view now-view" :class="{ show: tab === 'now' }">
+        <section class="queue" aria-label="Queue" @dragover="edgeScroll($event, $refs.queueList)">
+          <div class="section-head">
+            <h2>Up next</h2>
+            <span class="queue-meta" x-show="queue.count">
+              <span x-text="plural(queue.count, 'song')"></span>
+              <button class="ghost" @click="clearQueue()">Clear</button>
+            </span>
+          </div>
+          <p class="empty" x-show="queue.repeat === 'one' && current">Repeat one is on: this song plays again when it ends.</p>
+          <!-- the scrolling box: the whole queue lives in here -->
+          <div class="queue-list" x-ref="queueList">
+            <template x-for="(t, i) in upNext" :key="i + '-' + t.id">
+              <div>
+                <!-- small section labels, like Spotify -->
+                <p class="q-label" x-show="i === 0 && queue.queued > 0">Next in queue</p>
+                <p class="q-label" x-show="i === queue.queued && i < queue.draggable && queue.queued > 0"
+                   x-text="queue.from ? `Next from: ${queue.from}` : 'Next up'"></p>
+                <p class="q-label" x-show="i === queue.draggable && queue.repeat !== 'off'">Then from the start</p>
+                <!-- a div, not a button: Safari's engine won't reliably drag a button -->
+                <div class="q-item" role="button" tabindex="0" @click="jump(i)" @keydown.enter="jump(i)"
+                     :draggable="i < queue.draggable"
+                     :class="{ dragging: drag.from === i,
+                               'drop-above': drag.over === i && drag.from > i,
+                               'drop-below': drag.over === i && drag.from < i }"
+                     @dragstart="startDrag(i, $event)"
+                     @dragover.prevent="dragOver(i)"
+                     @drop.prevent="dropAt(i)"
+                     @dragend="endDrag()">
+                  <span class="tile" :style="artStyle(t.art_id)"></span>
+                  <span class="q-text"><span class="q-title truncate" x-text="t.title"></span><span class="q-artist truncate" x-text="t.artist"></span></span>
+                  <span class="q-dur" x-text="fmt(t.duration)"></span>
+                </div>
+              </div>
+            </template>
+            <p class="empty" x-show="queue.count > queue.up_next.length" x-text="`…and ${queue.count - queue.up_next.length} more`"></p>
+            <p class="empty" x-show="!queue.count && queue.repeat !== 'one'">Nothing queued. Click a song to play it and everything after it, or use + / right-click to queue one.</p>
+          </div>
         </section>
 
         <!-- Visualizers: shapes only for now; real data in slice 9 -->
@@ -183,6 +233,18 @@
     </aside>
   </div>
 
+  <!-- The one shared queue menu, opened by right-clicking a song.
+       Two elements on purpose: the anchor only sets the position (:style), the menu only
+       shows/hides (x-show). On one element, the two would overwrite each other's style. -->
+  <div class="menu-anchor" :style="menu ? `left:${menu.x}px;top:${menu.y}px` : ''">
+    <div class="add-menu" x-show="menu" x-cloak @click.outside="menu = null" @contextmenu.prevent>
+      <button @click="menuChoice()">Add to queue</button>
+    </div>
+  </div>
+
+  <!-- A short message, e.g. "Denial will play next" -->
+  <div class="toast" x-show="notice" x-transition.opacity x-text="notice" x-cloak></div>
+
   <!-- ===== Player bar ===== -->
   <footer class="player">
     <div class="player-left">
@@ -194,14 +256,14 @@
     </div>
     <div class="player-center">
       <div class="transport">
-        <button class="icon-btn" aria-label="Shuffle" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
-        <button class="icon-btn" aria-label="Previous" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.5 12.9a1 1 0 0 1 0-1.8l7.95-5.73A1 1 0 0 1 19 6.2z"/></svg></button>
+        <button class="icon-btn" :class="{ on: queue.shuffle }" :aria-label="queue.shuffle ? 'Shuffle on' : 'Shuffle off'" @click="toggleShuffle()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+        <button class="icon-btn" aria-label="Previous" @click="previous()" :disabled="!current"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="3" height="14" rx="1"/><path d="M19 6.2v11.6a1 1 0 0 1-1.55.83L9.5 12.9a1 1 0 0 1 0-1.8l7.95-5.73A1 1 0 0 1 19 6.2z"/></svg></button>
         <button class="play" :aria-label="playing ? 'Pause' : 'Play'" @click="toggle()" :disabled="!library.tracks.length">
           <svg x-show="playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
           <svg x-show="!playing" width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 8 4.5z"/></svg>
         </button>
-        <button class="icon-btn" aria-label="Next" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="16" y="5" width="3" height="14" rx="1"/><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l7.95-5.73a1 1 0 0 0 0-1.8L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg></button>
-        <button class="icon-btn" aria-label="Repeat" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></button>
+        <button class="icon-btn" aria-label="Next" @click="next()" :disabled="!queue.count"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="16" y="5" width="3" height="14" rx="1"/><path d="M5 6.2v11.6a1 1 0 0 0 1.55.83l7.95-5.73a1 1 0 0 0 0-1.8L6.55 5.37A1 1 0 0 0 5 6.2z"/></svg></button>
+        <button class="icon-btn repeat" :class="{ on: queue.repeat !== 'off' }" :aria-label="`Repeat ${queue.repeat}`" :title="`Repeat: ${queue.repeat}`" @click="cycleRepeat()"><span class="badge" x-show="queue.repeat === 'one'">1</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></button>
       </div>
       <div class="progress">
         <time x-text="elapsed"></time>

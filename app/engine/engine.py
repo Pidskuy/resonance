@@ -45,10 +45,12 @@ class Engine:
         self.channels = 0
         self.total_frames = 0
         self.underruns = 0              # times the callback ran out of data (should stay 0)
+        self.ended = False              # True when a track finished by itself (not stopped)
         self._file = None
         self._stream = None
         self._thread = None
         self._buffer = None
+        self._end_of_file = False
         self._lock = threading.Lock()
         self._frames_played = 0         # frame number we've sent to the device
 
@@ -74,6 +76,7 @@ class Engine:
         self._buffer = RingBuffer(self.rate * BUFFER_SECONDS, self.channels)
         self._frames_played = 0
         self.underruns = 0
+        self.ended = False
         self._end_of_file = False
         self._seek_request = None
         self._fade = None               # None, "in" or "out": applied to the next block only
@@ -133,8 +136,11 @@ class Engine:
             self.resume()                             # fades back in
 
     def stop(self) -> None:
-        if self.state == "playing":
+        track_over = self._end_of_file and self._buffer.available == 0
+        if self.state == "playing" and not track_over:
             self.pause()                              # fade out first: no click
+                                                      # (skipped if the track already ran out:
+                                                      #  nothing is playing, so there's nothing to fade)
         self._running = False
         if self._stream is not None:
             self._stream.stop()
@@ -168,6 +174,7 @@ class Engine:
             outdata *= self._fade_in[:frames]
             self._fade = None
         if got < frames and self._end_of_file:
+            self.ended = True                         # the Api watches this to start the next song
             raise sd.CallbackStop                     # tells sounddevice: the track is over
 
     def _on_finished(self) -> None:
