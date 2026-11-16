@@ -55,3 +55,24 @@ def test_clear_empties_it():
     buf.clear()
     assert buf.available == 0
     assert buf.space == 10
+
+
+def test_truncate_takes_back_frames_written_after_a_point():
+    buf = RingBuffer(capacity=10, channels=2)
+    buf.write(frames(0, 3))
+    mark = buf.write_count                    # the next song would start here
+    buf.write(frames(100, 4))                 # read-ahead of the next song
+    buf.truncate(mark)
+    buf.write(frames(200, 2))                 # a different next song instead
+    out = np.empty((5, 2), dtype=np.float32)
+    assert buf.read_into(out) == 5
+    assert np.array_equal(out, np.concatenate([frames(0, 3), frames(200, 2)]))
+
+
+def test_truncate_never_takes_back_frames_already_played():
+    buf = RingBuffer(capacity=10, channels=2)
+    buf.write(frames(0, 6))
+    buf.read_into(np.empty((4, 2), dtype=np.float32))
+    buf.truncate(2)                           # asks to go back before what was played
+    assert buf.write_count == buf.read_count == 4
+    assert buf.available == 0

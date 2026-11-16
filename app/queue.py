@@ -57,6 +57,19 @@ class PlayQueue:
             ids += [e.track_id for e in self.cycle]
         return ids
 
+    def peek_next(self) -> int | None:
+        """The song that will play when this one ends by itself, WITHOUT moving.
+        The engine reads it ahead of time for gapless playback."""
+        if self.current is None:
+            return None
+        if self.repeat == "one":
+            return self.current_id
+        if self.upcoming:
+            return self.upcoming[0].track_id
+        if self.repeat != "off" and self.cycle:
+            return self.cycle[0].track_id
+        return None
+
     def queued_count(self) -> int:
         """How many songs at the top of Up next are yours (the "Next in queue" section)."""
         count = 0

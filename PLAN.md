@@ -27,6 +27,7 @@ This file holds every decision made during planning. If something here needs to 
 - Two tracks in a row with the **same sample rate and channel count** play with zero gap. The stream stays open and the next track's samples follow straight on.
 - When the next track has a **different sample rate**, the stream must close and reopen at the new rate. A short gap there is unavoidable (every player has it). It should be as short as possible and must not click.
 - **Known risk:** MP3 files carry encoder padding (silence added at the start and end). FLAC and WAV are exactly gapless. Check whether our MP3 decoder strips that padding. If it doesn't, document it as a known limitation. Don't burn days on it.
+  - **Checked in slice 7 (2026-11-16):** libsndfile strips it when the MP3 has a LAME/Xing header (almost all modern MP3s, including the test MP3s): a 2 s tone decodes to exactly its original length. MP3s without that header may keep a tiny gap; that's a known limitation.
 
 ---
 
@@ -136,6 +137,7 @@ Up Next queue, next / previous, shuffle, repeat (off / all / one), click a track
 ### Slice 7: Gapless + rate switching
 Decoder pre-loads the next track. Same rate + channels → continue in the same stream. Different rate → clean stream restart at the new rate (fade or silence-pad to avoid clicks).
 **Done when:** the split test tone plays with **no audible gap**, and a 44.1k → 96k transition switches the DAC without a click.
+*How it was built:* the Api tells the engine the next song (`set_next`, from `queue.peek_next()`); the decoder reads it into the same ring buffer and marks the boundary frame, and the callback switches the current song exactly there. If the queue changes after reading ahead, the read-ahead is taken back. A rate change ends the stream; the next one starts with 0.15 s of silence so the DAC can switch cleanly. The last ~6 ms before any stream stops get a tiny fade, so a song ending mid-wave can't click (the only place samples are changed at volume 100%). Tested without a sound card: part1 → part2 comes out identical, sample for sample, to the uncut tone.
 
 ### Slice 8: Output device, format label, volume
 Output-device picker in the player bar (remembers your DAC), format label (`FLAC · 24/96`), volume slider (100% = untouched), bit-perfect badge.

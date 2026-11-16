@@ -30,6 +30,21 @@ class RingBuffer:
         """Frames that can still be put on."""
         return self.capacity - self.available
 
+    @property
+    def write_count(self) -> int:
+        """How many frames have ever been put on. Marks where the next frame will go."""
+        return self._write
+
+    @property
+    def read_count(self) -> int:
+        """How many frames have ever been taken off (played)."""
+        return self._read
+
+    def truncate(self, write_count: int) -> None:
+        """Take back everything put on after `write_count`, as if it was never written.
+        Frames already taken off can't be taken back, so it never goes below that."""
+        self._write = max(self._read, min(write_count, self._write))
+
     def write(self, frames: np.ndarray) -> None:
         """Put frames on the belt. The caller must check `space` first."""
         n = len(frames)

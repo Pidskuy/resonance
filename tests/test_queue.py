@@ -230,3 +230,25 @@ def test_context_name_is_remembered_and_cleared():
     assert q.context_name == "All songs"
     q.clear()
     assert q.context_name == ""
+
+
+# ---------- peeking (for gapless: the engine reads the next song early) ----------
+
+@pytest.mark.parametrize("shuffle", [False, True])
+@pytest.mark.parametrize("repeat", ["off", "all", "one"])
+def test_peek_next_is_what_plays_when_the_song_ends(shuffle, repeat):
+    for start in SONGS:                       # including the last song (end of the list)
+        q = queue(start=start, shuffle=shuffle, repeat=repeat)
+        q.add(99)
+        for _ in range(8):                    # walk through the queue, peeking each time
+            peeked = q.peek_next()
+            assert q.next(auto=True) == peeked
+            if peeked is None:
+                break
+
+
+def test_peek_does_not_move_the_queue():
+    q = queue(start=20)
+    q.peek_next()
+    q.peek_next()
+    assert q.current_id == 20 and q.up_next() == [30, 40, 50]
